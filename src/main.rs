@@ -1,10 +1,10 @@
 mod event_handler;
 
 use dotenv::dotenv;
-use event_handler::{Handler, GENERAL_GROUP};
-use serenity::framework::standard::StandardFramework;
-use serenity::prelude::*;
 use std::env;
+
+use event_handler::{Handler, GENERAL_GROUP};
+use serenity::{framework::standard::StandardFramework, prelude::*};
 
 static PREFIX: &'static str = "!rustybot";
 

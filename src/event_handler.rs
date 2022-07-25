@@ -1,6 +1,7 @@
 use crate::PREFIX;
 use clap::Parser;
 
+use regex::Regex;
 use serenity::{
     async_trait,
     client::{Context, EventHandler},
@@ -36,7 +37,16 @@ struct EchoArgs {
 
 #[command]
 async fn echo(ctx: &Context, msg: &Message) -> CommandResult {
-    let mut args: Vec<&str> = msg.content.split(" ").collect();
+    let regex = Regex::new(r#""[^"]+"|[^\s]+"#).unwrap();
+
+    let mut args: Vec<String> = regex
+        .find_iter(&msg.content)
+        .filter_map(|data| {
+            let quotes = Regex::new(r#"""#).unwrap();
+            Some(quotes.replace_all(data.as_str(), "").to_string())
+        })
+        .collect();
+
     args.remove(0);
 
     match EchoArgs::try_parse_from(args.into_iter()) {

@@ -6,14 +6,14 @@ use std::env;
 use event_handler::{Handler, GENERAL_GROUP};
 use serenity::{framework::standard::StandardFramework, prelude::*};
 
-static PREFIX: &'static str = "!rustybot";
+static BOT_NAME: &'static str = "rustybot";
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
 
     let framework = StandardFramework::new()
-        .configure(|c| c.prefixes(vec![std::format!("{} ", PREFIX).as_str(), PREFIX]))
+        .configure(|c| c.prefix("!"))
         .group(&GENERAL_GROUP);
 
     // Login with a bot token from the environment

@@ -1,5 +1,5 @@
-use crate::PREFIX;
-use clap::Parser;
+use crate::BOT_NAME;
+use clap::{Args, Parser, Subcommand};
 
 use regex::Regex;
 use serenity::{
@@ -24,22 +24,38 @@ impl EventHandler for Handler {
 
 //// Commands //////////////////////////////////////////////////////////////////////////////////////
 #[group]
-#[commands(echo)]
+#[commands(rustybot)]
 pub struct General;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct EchoArgs {
-    /// Name of the person to greet
+#[clap(name = BOT_NAME, author, version, about, long_about = None)]
+pub struct Cli {
+    #[clap(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Echos the specified message a specified amount of time
+    Echo(EchoData),
+}
+
+#[derive(Args, Debug)]
+pub struct EchoData {
+    /// message to echo
     #[clap(short, long, value_parser)]
-    content: String,
+    pub message: Option<String>,
+
+    /// echo amount
+    #[clap(short, long, value_parser, default_value_t = 1)]
+    pub count: u32,
 }
 
 #[command]
-async fn echo(ctx: &Context, msg: &Message) -> CommandResult {
-    let regex = Regex::new(r#""[^"]+"|[^\s]+"#).unwrap();
+async fn rustybot(ctx: &Context, msg: &Message) -> CommandResult {
+    let regex = Regex::new(r#""[^"]+"|[^!\s]+"#).unwrap();
 
-    let mut args: Vec<String> = regex
+    let args: Vec<String> = regex
         .find_iter(&msg.content)
         .filter_map(|data| {
             let quotes = Regex::new(r#"""#).unwrap();
@@ -47,27 +63,30 @@ async fn echo(ctx: &Context, msg: &Message) -> CommandResult {
         })
         .collect();
 
-    args.remove(0);
+    let mut help_str: String = "".to_string();
+    match Cli::try_parse_from(args.into_iter()) {
+        Ok(data) => match &data.command {
+            Commands::Echo(echo) => {
+                let out = match &echo.message {
+                    Some(data) => data,
+                    None => {
+                        help_str = std::format!("run '!{} echo -h' for help.", BOT_NAME);
+                        ""
+                    }
+                };
 
-    match EchoArgs::try_parse_from(args.into_iter()) {
-        Ok(data) => {
-            msg.reply(ctx, std::format!("```{}```", data.content))
-                .await?;
-        }
-        Err(e) => {
-            let mut sentence = e.to_string();
-            let mut words: Vec<&str> = sentence.split(" ").collect();
-            match words.iter().position(|&word| word == "echo") {
-                Some(position) => {
-                    words.insert(position + 1, "[OPTIONS]");
-                    words.remove(position);
-                    words.insert(position, PREFIX);
-                    sentence = words.join(" ");
+                if out != "" {
+                    for _ in 0..(echo.count) {
+                        msg.reply(ctx, std::format!("```{}```", out)).await?;
+                    }
+                } else {
+                    msg.reply(ctx, std::format!("```{}```", help_str)).await?;
                 }
-                None => {}
-            };
-
-            msg.reply(ctx, std::format!("```{}```", sentence)).await?;
+            }
+        },
+        Err(e) => {
+            msg.reply(ctx, std::format!("error:```{}```", e.to_string()))
+                .await?;
         }
     };
 

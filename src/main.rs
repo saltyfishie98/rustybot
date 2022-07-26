@@ -11,6 +11,7 @@ static BOT_NAME: &'static str = "rustybot";
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    // env::set_var("RUST_BACKTRACE", "1");
 
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("!"))

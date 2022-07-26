@@ -9,6 +9,8 @@ use serenity::{
         macros::{command, group},
         CommandResult,
     },
+    http::CacheHttp,
+    json::json,
     model::{channel::Message, gateway::Ready},
 };
 
@@ -18,7 +20,7 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name)
+        println!("{} is connected!", ready.user.name);
     }
 }
 
@@ -38,6 +40,9 @@ pub struct Cli {
 pub enum Commands {
     /// Echos the specified message a specified amount of time
     Echo(EchoData),
+
+    /// Delete messages starting from the latest
+    Delete { count: u32 },
 }
 
 #[derive(Args, Debug)]
@@ -82,6 +87,24 @@ async fn rustybot(ctx: &Context, msg: &Message) -> CommandResult {
                 } else {
                     msg.reply(ctx, std::format!("```{}```", help_str)).await?;
                 }
+            }
+
+            Commands::Delete { count } => {
+                let http = ctx.http();
+                let channel_id = msg.channel_id;
+                let res = channel_id
+                    .messages(http, |retriver| retriver.limit(count.clone() as u64))
+                    .await;
+
+                match res {
+                    Ok(data) => match channel_id.delete_messages(http, data).await {
+                        Ok(_) => (),
+                        Err(e) => println!("{:#?}", e),
+                    },
+                    Err(e) => {
+                        println!("{}", e);
+                    }
+                };
             }
         },
         Err(e) => {

@@ -1,12 +1,10 @@
-mod event_handler;
-mod helpers;
+mod discord;
 mod parser;
 
+use discord::event_handler::{Handler, GENERAL_GROUP};
 use dotenv::dotenv;
-use std::env;
-
-use event_handler::{Handler, GENERAL_GROUP};
 use serenity::{framework::standard::StandardFramework, prelude::*};
+use std::env;
 
 static BOT_NAME: &'static str = "xyz";
 

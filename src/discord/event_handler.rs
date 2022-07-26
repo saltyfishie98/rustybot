@@ -38,14 +38,14 @@ async fn xyz(ctx: &Context, msg: &Message) -> CommandResult {
         msg: &msg,
     };
 
-    let args = filter_message(&handle.msg.content.as_str());
+    let args = shape_commands(&handle.msg.content.as_str());
     parse_command(&handle, &args).await;
 
     Ok(())
 }
 
-fn filter_message<'a>(msg: &'a str) -> Vec<String> {
-    Regex::new(r#""[^"]+"|[^!\s]+"#)
+fn shape_commands<'a>(msg: &'a str) -> Vec<String> {
+    Regex::new(r#""[^"]+"|'[^']+'|[^!\s]+"#)
         .expect("Invalid regex pattern!")
         .find_iter(&msg)
         .filter_map(|data| {
@@ -53,4 +53,13 @@ fn filter_message<'a>(msg: &'a str) -> Vec<String> {
             Some(quotes.replace_all(data.as_str(), "").to_string())
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn shape_commands() {
+        let messages = super::shape_commands(r#"!start "double quotes's" mid end"#);
+        assert_eq!(messages, vec!["start", "double quotes's", "mid", "end"]);
+    }
 }

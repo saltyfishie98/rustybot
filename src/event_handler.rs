@@ -10,9 +10,16 @@ use serenity::{
         CommandResult,
     },
     http::CacheHttp,
-    json::json,
     model::{channel::Message, gateway::Ready},
 };
+
+fn cli_message(msg: &String) -> String {
+    std::format!("```{}```", msg)
+}
+
+fn cli_error(msg: &String) -> String {
+    std::format!("```ERROR: {}```", msg)
+}
 
 //// Event Handler /////////////////////////////////////////////////////////////////////////////////
 pub struct Handler;
@@ -31,29 +38,40 @@ pub struct General;
 
 #[derive(Parser, Debug)]
 #[clap(name = BOT_NAME, author, version, about, long_about = None)]
-pub struct Cli {
+struct Cli {
     #[clap(subcommand)]
-    pub command: Commands,
+    command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
-pub enum Commands {
+enum Commands {
     /// Echos the specified message a specified amount of time
     Echo(EchoData),
 
-    /// Delete messages starting from the latest
-    Delete { count: u32 },
+    /// Delete messages starting from the latest [1 to 99]
+    Clear(ClearData),
 }
 
 #[derive(Args, Debug)]
-pub struct EchoData {
+struct EchoData {
     /// message to echo
     #[clap(short, long, value_parser)]
-    pub message: Option<String>,
+    message: String,
 
     /// echo amount
     #[clap(short, long, value_parser, default_value_t = 1)]
-    pub count: u32,
+    count: u32,
+}
+
+#[derive(Args, Debug)]
+struct ClearData {
+    /// echo amount
+    #[clap(short, long, value_parser, default_value_t = 1)]
+    count: u32,
+
+    /// use a raw loop instead of a single api call
+    #[clap(long)]
+    force: bool,
 }
 
 #[command]
@@ -68,48 +86,73 @@ async fn rustybot(ctx: &Context, msg: &Message) -> CommandResult {
         })
         .collect();
 
-    let mut help_str: String = "".to_string();
     match Cli::try_parse_from(args.into_iter()) {
         Ok(data) => match &data.command {
             Commands::Echo(echo) => {
-                let out = match &echo.message {
-                    Some(data) => data,
-                    None => {
-                        help_str = std::format!("run '!{} echo -h' for help.", BOT_NAME);
-                        ""
-                    }
-                };
+                for _ in 0..(echo.count) {
+                    let res = msg.reply(ctx, cli_message(&echo.message)).await;
 
-                if out != "" {
-                    for _ in 0..(echo.count) {
-                        msg.reply(ctx, std::format!("```{}```", out)).await?;
+                    match res {
+                        Ok(_) => (),
+                        Err(e) => println!("{}", e),
                     }
-                } else {
-                    msg.reply(ctx, std::format!("```{}```", help_str)).await?;
                 }
             }
 
-            Commands::Delete { count } => {
+            Commands::Clear(data) => {
                 let http = ctx.http();
                 let channel_id = msg.channel_id;
+
                 let res = channel_id
-                    .messages(http, |retriver| retriver.limit(count.clone() as u64))
+                    .messages(http, |retriver| {
+                        retriver.limit((data.count.clone() as u64) + 1)
+                    })
                     .await;
 
-                match res {
-                    Ok(data) => match channel_id.delete_messages(http, data).await {
-                        Ok(_) => (),
-                        Err(e) => println!("{:#?}", e),
-                    },
-                    Err(e) => {
-                        println!("{}", e);
+                if data.force {
+                    match res {
+                        Ok(ids) => {
+                            for id in ids {
+                                match channel_id.delete_message(http, id).await {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        let res = msg.reply(http, cli_error(&e.to_string())).await;
+                                        match res {
+                                            Ok(_) => (),
+                                            Err(e) => println!("{}", e),
+                                        }
+                                    }
+                                };
+                            }
+                        }
+                        Err(_) => (),
                     }
-                };
+                } else {
+                    match res {
+                        Ok(ids) => match channel_id.delete_messages(http, ids).await {
+                            Ok(_) => (),
+                            Err(e) => {
+                                let res = msg.reply(http, cli_error(&e.to_string())).await;
+                                match res {
+                                    Ok(_) => (),
+                                    Err(e) => println!("{}", e),
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            println!("{}", e);
+                        }
+                    };
+                }
             }
         },
         Err(e) => {
-            msg.reply(ctx, std::format!("error:```{}```", e.to_string()))
-                .await?;
+            let res = msg.reply(ctx, cli_message(&e.to_string())).await;
+
+            match res {
+                Ok(_) => (),
+                Err(e) => println!("{}", e),
+            }
         }
     };
 

@@ -1,7 +1,9 @@
-use crate::BOT_NAME;
-use clap::{Args, Parser, Subcommand};
-
 use regex::Regex;
+
+use crate::{
+    helpers::{cli_error, cli_message},
+    parser::{Cli, Commands},
+};
 use serenity::{
     async_trait,
     client::{Context, EventHandler},
@@ -12,14 +14,6 @@ use serenity::{
     http::CacheHttp,
     model::{channel::Message, gateway::Ready},
 };
-
-fn cli_message(msg: &String) -> String {
-    std::format!("```{}```", msg)
-}
-
-fn cli_error(msg: &String) -> String {
-    std::format!("```ERROR: {}```", msg)
-}
 
 //// Event Handler /////////////////////////////////////////////////////////////////////////////////
 pub struct Handler;
@@ -33,59 +27,22 @@ impl EventHandler for Handler {
 
 //// Commands //////////////////////////////////////////////////////////////////////////////////////
 #[group]
-#[commands(rustybot)]
+#[commands(xyz)]
 pub struct General;
 
-#[derive(Parser, Debug)]
-#[clap(name = BOT_NAME, author, version, about, long_about = None)]
-struct Cli {
-    #[clap(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
-    /// Echos the specified message a specified amount of time
-    Echo(EchoData),
-
-    /// Delete messages starting from the latest [1 to 99]
-    Clear(ClearData),
-}
-
-#[derive(Args, Debug)]
-struct EchoData {
-    /// message to echo
-    #[clap(short, long, value_parser)]
-    message: String,
-
-    /// echo amount
-    #[clap(short, long, value_parser, default_value_t = 1)]
-    count: u32,
-}
-
-#[derive(Args, Debug)]
-struct ClearData {
-    /// echo amount
-    #[clap(short, long, value_parser, default_value_t = 1)]
-    count: u32,
-
-    /// use a raw loop instead of a single api call
-    #[clap(long)]
-    force: bool,
-}
-
 #[command]
-async fn rustybot(ctx: &Context, msg: &Message) -> CommandResult {
-    let regex = Regex::new(r#""[^"]+"|[^!\s]+"#).unwrap();
+async fn xyz(ctx: &Context, msg: &Message) -> CommandResult {
+    let regex = Regex::new(r#""[^"]+"|[^!\s]+"#).expect("Invalid regex pattern!");
 
     let args: Vec<String> = regex
         .find_iter(&msg.content)
         .filter_map(|data| {
-            let quotes = Regex::new(r#"""#).unwrap();
+            let quotes = Regex::new(r#"""#).expect("Invalid regex pattern!");
             Some(quotes.replace_all(data.as_str(), "").to_string())
         })
         .collect();
 
+    use clap::Parser;
     match Cli::try_parse_from(args.into_iter()) {
         Ok(data) => match &data.command {
             Commands::Echo(echo) => {

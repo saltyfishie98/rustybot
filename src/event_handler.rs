@@ -110,35 +110,28 @@ async fn rustybot(ctx: &Context, msg: &Message) -> CommandResult {
                     .await;
 
                 if data.force {
-                    match res {
-                        Ok(ids) => {
-                            for id in ids {
-                                match channel_id.delete_message(http, id).await {
+                    if let Ok(ids) = res {
+                        for id in ids {
+                            if let Err(e) = channel_id.delete_message(http, id).await {
+                                let res = msg.reply(http, cli_error(&e.to_string())).await;
+                                match res {
                                     Ok(_) => (),
-                                    Err(e) => {
-                                        let res = msg.reply(http, cli_error(&e.to_string())).await;
-                                        match res {
-                                            Ok(_) => (),
-                                            Err(e) => println!("{}", e),
-                                        }
-                                    }
-                                };
-                            }
+                                    Err(e) => println!("{}", e),
+                                }
+                            };
                         }
-                        Err(_) => (),
                     }
                 } else {
                     match res {
-                        Ok(ids) => match channel_id.delete_messages(http, ids).await {
-                            Ok(_) => (),
-                            Err(e) => {
+                        Ok(ids) => {
+                            if let Err(e) = channel_id.delete_messages(http, ids).await {
                                 let res = msg.reply(http, cli_error(&e.to_string())).await;
                                 match res {
                                     Ok(_) => (),
                                     Err(e) => println!("{}", e),
                                 }
                             }
-                        },
+                        }
                         Err(e) => {
                             println!("{}", e);
                         }

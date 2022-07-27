@@ -1,3 +1,5 @@
+#![feature(slice_as_chunks)]
+
 mod discord;
 mod parser;
 

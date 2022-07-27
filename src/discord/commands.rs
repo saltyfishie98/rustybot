@@ -2,8 +2,9 @@ use super::{
     event_handler::DiscordHandle,
     helpers::{cli_error, cli_message},
 };
-use crate::parser::{ClearData, Cli, Commands, EchoData};
+use crate::parser::{ClearData, Cli, Commands, EchoData, ViewData};
 use serenity::http::CacheHttp;
+use webscreenshotlib::{screenshot_tab, write_screenshot, OutputFormat};
 
 pub async fn parse_command<'a>(handle: &'a DiscordHandle<'a>, args: &Vec<String>) {
     use clap::Parser;
@@ -11,6 +12,7 @@ pub async fn parse_command<'a>(handle: &'a DiscordHandle<'a>, args: &Vec<String>
         Ok(data) => match &data.command {
             Commands::Echo(data) => echo_cb(&handle, &data).await,
             Commands::Clear(data) => clear_cb(&handle, &data).await,
+            Commands::View(data) => view_cb(&handle, &data).await,
         },
         Err(e) => {
             let &DiscordHandle { ctx, msg } = handle;
@@ -69,4 +71,31 @@ async fn clear_cb<'a>(handle: &'a DiscordHandle<'a>, data: &ClearData) {
             }
         };
     }
+}
+
+async fn view_cb<'a>(handle: &'a DiscordHandle<'a>, data: &ViewData) {
+    let &DiscordHandle { ctx, msg } = handle;
+
+    let image = match screenshot_tab(
+        data.url.as_str(),
+        OutputFormat::PNG,
+        80,
+        false,
+        data.width,
+        data.height,
+        "",
+    ) {
+        Ok(data) => data,
+        Err(_) => vec![0],
+    };
+
+    write_screenshot("temp/images/view.png", image).expect("write error!");
+
+    msg.channel_id
+        .send_files(ctx, ["temp/images/view.png"], |m| {
+            m.reference_message(msg)
+                .allowed_mentions(|am| am.replied_user(true))
+        })
+        .await
+        .expect("file upload error");
 }
